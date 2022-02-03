@@ -29,7 +29,7 @@ script = "build.py"
 generate-setup-file = false
 
 [tool.poetry.scripts]
-actortest = "actortest.__main__:main"
+actortest = "actortest.__main__:actortest"
 
 [tool.poetry.dependencies]
 python = "^3.7,<4.0"

@@ -7,40 +7,55 @@
 # @License: BSD 3-Clause
 # @Copyright: José Sánchez-Gallego
 
-import argparse
 import os
-import sys
 
-from actortest.main import math
+import click
+from click_default_group import DefaultGroup
+from clu.tools import cli_coro
 
+from sdsstools.daemonizer import DaemonGroup
 
-def main():
-
-    # An example of how to write a command line parser that works with the
-    # main.math function. For more details on how to use argparse, start with
-    # this tutorial: http://bit.ly/2SGDf7h
-
-    parser = argparse.ArgumentParser(
-        prog=os.path.basename(sys.argv[0]),
-        description='Performs an arithmetic operation.')
-
-    parser.add_argument('VALUE1', type=float, help='The first operand')
-    parser.add_argument('OPERATOR', type=str, help='The operator [+, -, *, /]')
-    parser.add_argument('VALUE2', type=float, help='The second operand')
-
-    parser.add_argument('-v', '--verbose', action='store_true', default=False,
-                        help='sets verbose mode')
-
-    args = parser.parse_args()
-
-    result = math(args.VALUE1, args.VALUE2, arith_operator=args.OPERATOR)
-
-    if args.verbose:
-        print('{} {} {} = {}'.format(args.VALUE1, args.OPERATOR, args.VALUE2, result))
-    else:
-        print(result)
+from actortest.actor.actor import testactor as TESTActorInstance
 
 
-if __name__ == '__main__':
+@click.group(cls=DefaultGroup, default="actor", default_if_no_args=True)
+@click.option(
+    "-c",
+    "--config",
+    "config_file",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to the user configuration file.",
+)
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Debug mode. Use additional v for more details.",
+)
+@click.pass_context
+def actortest(ctx, config_file, verbose):
+    """brings the configuration .yaml file"""
 
-    main()
+    ctx.obj = {"verbose": verbose, "config_file": config_file}
+
+
+@actortest.group(cls=DaemonGroup, prog="actortest_actor", workdir=os.getcwd())
+@click.pass_context
+@cli_coro
+async def actor(ctx):
+    """Runs the actor."""
+    default_config_file = os.path.join(os.path.dirname(__file__), "etc/actortest.yml")
+    config_file = ctx.obj["config_file"] or default_config_file
+
+    actortest_obj = TESTActorInstance.from_config(config_file)
+
+    if ctx.obj["verbose"]:
+        actortest_obj.log.fh.setLevel(0)
+        actortest_obj.log.sh.setLevel(0)
+
+    await actortest_obj.start()
+    await actortest_obj.run_forever()
+
+
+if __name__ == "__main__":
+    actortest()
